@@ -1,0 +1,2 @@
+CTF{The_eastern_world_it_is_exploding}
+password: Yg
