@@ -1,0 +1,56 @@
+1. readline for first command
+2. enter get
+3. enter path with len 8k end contains ..
+4. path free
+5. command free
+
+Freelist:
+free command -> free path buffer
+
+6. next command - overflow 2nd buffer fwd ptr
+7. enter language - gets 1st buffer
+8. length - gets 2nd buffer and global language ptr will be controlled !
+8. Overwrite !!
+
+
+
+Need short buffer
+---------------------------------------
+1. readline for first command
+2. enter language
+3. enter language with len < 7
+
+4. memory after set_language - 
+
+heap: *command | *new_language | language
+freelist:
+	idx10: command -> new_language
+
+5. enter language command
+6. enter language with big len
+7. memory after set_language - 
+
+heap: *command | *new_language | *language | big_language
+freelist:
+	idx10: 	command -> new_language
+	idx1:	language
+
+8. overflow language with fwd = ADDRESS.
+9. enter language command
+10. enter language with len < 7
+11. memory after set_language - 
+
+heap: idx10-*command | idx10-*new_language | idx0-language | idx10-*big_language
+freelist:
+	idx10: 	command -> big_language -> new_language
+	idx0:	ADDR
+
+
+12. overwrite language idx with invalid command
+13. enter language command with len < 16
+14. memory after set_language - 
+
+heap: idx10-*command | idx10-*new_language | idxFAKE-language | idx10-*big_language
+freelist:
+	idx10: 	command -> big_language -> new_language
+	idx0:	STRING_ADDR

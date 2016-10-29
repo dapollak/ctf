@@ -1,0 +1,23 @@
+all aritmethics is module 0xB8C827FD
+
+do
+    {
+      v95 *= v95;
+      if ( _bittest(&v94, v93) )
+        v95 *= v80;
+      --v93;
+    }
+    while ( v93 != -1LL );
+
+it is just some pow-modulu of initial value in v95.
+Calculate the exponent - 
+
+n = '001101110100011001010100100011'
+e = 1
+for i in xrange(30):
+    e *= 2
+        if n[i] == '1':
+            e += 1
+
+=> e = 1305580835, modulu = 0xB8C827FD = 51787*59863 (two primes - p, q)
+phi(m) =  (51787-1)*(59863-1) ==> d = 1859368307
