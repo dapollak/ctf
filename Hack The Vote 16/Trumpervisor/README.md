@@ -3,23 +3,23 @@ Trumpervisor - RE 500
 We are given a Windows 10 x64 driver which uses hardware-assisted virtualization features of x86-64 processors.
 Unfortunately, the solution doesn't take advantage of all the capabilities of virtualization, but it was still fun to reverse that driver.
 
-1. The driver is basically implements the concept of [Blue Pill](https://en.wikipedia.org/wiki/Blue_Pill_(software)) - i.e a hypervisor which virtualize the whole system, and it is loaded from within the system - we'll see an examples for that behavior later :)
-2. The driver code is very similar to [SimpleVisor](https://github.com/ionescu007/SimpleVisor) by Alex Ionescu - I used it as a reference a lot.
+* The driver is basically implements the concept of [Blue Pill](https://en.wikipedia.org/wiki/Blue_Pill_(software)) - i.e a hypervisor which virtualize the whole system, and it is loaded from within the system - we'll see an examples for that behavior later :)
+* The driver code is very similar to [SimpleVisor](https://github.com/ionescu007/SimpleVisor) by Alex Ionescu - I used it as a reference a lot.
 
 ### Driver Analysis
 The ```DriverEntry``` is at ```0x140007000``` and calls to a function at ```0x140001450```.
 What this function do is:
-1. Creates a device named ```Trumpervisor``` which is visible to user mode application - because of the symbolic link to the ```DosDevice``` namespace.
-2. Fills the device's dispatch routines table - all of them actually does nothing excpet ```IRP_MJ_DEVICE_CONTROL```, which is handled by the routine at ```0x140001390```.
-3. Check for the existence of previous hypervisor (like hyper-v). If one is identified, the driver returns with error.
-4. If hypervisor isn't identified and processors supports VT-x, the driver set a DPC on all of available logical processors (using ```KeGenericCallDpc```) which loads the system as a VM on each of them. Also, allocates memory for virtualization data (VMCS for each processor, etc...)
+* Creates a device named ```Trumpervisor``` which is visible to user mode application - because of the symbolic link to the ```DosDevice``` namespace.
+* Fills the device's dispatch routines table - all of them actually does nothing excpet ```IRP_MJ_DEVICE_CONTROL```, which is handled by the routine at ```0x140001390```.
+* Check for the existence of previous hypervisor (like hyper-v). If one is identified, the driver returns with error.
+* If hypervisor isn't identified and processors supports VT-x, the driver set a DPC on all of available logical processors (using ```KeGenericCallDpc```) which loads the system as a VM on each of them. Also, allocates memory for virtualization data (VMCS for each processor, etc...)
 
 The DPC which finally launch the system as VM is at address ```0x140001740```, which is called also from the driver's unload routine. This routine is used for both launching a VM and unloading virtualization mode on particular processor, depends on its arguments. The unloading part is implemented with "magic sequence" will see later. The launching routine is at address ```0x140001630```:
 ![alt text](https://raw.githubusercontent.com/dapollak/ctf/master/Hack%20The%20Vote%2016/Trumpervisor/pic1.png)
 The function gets part of the memory big buffer which was allocated before and will be filled with data which is relevant for the VMCS initialization.
 We can see a call to ```RtlCaptureContext```, which saves the current processor state in a ```CONTEXT``` structure. Then, ```vmcs_buffer1 + 1460``` is checked, and if equals to 0, ```enter_root_mode_and_load_vmcs```, ```initialize_vmcs``` and ```vmlaunch``` instruction are called.
-1. ```enter_root_mode_and_load_vmcs``` at address ```0x1400017D0``` - enable vmx operation (```vmxon``` instruction) and load current vmcs sturcture pointer.
-2. ```initialize_vmcs``` at address ```0x1400018E0``` - initialize the vmcs, a lot of not interesting ```vmwrite``` instructions. We will return to this function later.
+* ```enter_root_mode_and_load_vmcs``` at address ```0x1400017D0``` - enable vmx operation (```vmxon``` instruction) and load current vmcs sturcture pointer.
+* ```initialize_vmcs``` at address ```0x1400018E0``` - initialize the vmcs, a lot of not interesting ```vmwrite``` instructions. We will return to this function later.
 
 At the end of ```initialize_vmcs```, we can see what the guest RIP is going to be:
 
@@ -74,9 +74,9 @@ We can see that just before the vmlaunch, ```vmcs_buffer1 + 1460``` is set to 1,
 Lets see the dispatch routine for DeviceIoControl - 
 ![alt text](https://raw.githubusercontent.com/dapollak/ctf/master/Hack%20The%20Vote%2016/Trumpervisor/pic3.png)
 We see two kinds of ioctls:
-1. At address ```0x140002210``` which set RAX to 0x4141414141414141 and call ```vmcall``` - Sadly, it has nothing to do with the solution.
-2. ```manipulate_globals``` at address ```0x1400012D0```.
-3. 
+* At address ```0x140002210``` which set RAX to 0x4141414141414141 and call ```vmcall``` - Sadly, it has nothing to do with the solution.
+* ```manipulate_globals``` at address ```0x1400012D0```.
+
 ### manipulate_globals function
 ![alt text](https://raw.githubusercontent.com/dapollak/ctf/master/Hack%20The%20Vote%2016/Trumpervisor/pic4.png)
 Basically, what this function do is xor the bytes at address ```0x1400030C0``` with cyclic 4 bytes length key at ```byte_140004020``` and prints it to debug stream - That looks like a CTF thing, so I guessed the bytes array at ```0x1400030C0``` is the xored-flag. Trying to force the 4 first bytes to be the string 'flag', we get that ```byte_140004020 = [0xb0, 0x93, 0x13, 0x80]```. Then we xored with 0xB0 the next byte, and got '{'. Luck ? No, it's probably the flag.
@@ -279,9 +279,9 @@ def get_flag():
 ```
 
 Few comments:
-1. Since RAX doesn't influence the array, I put it to be 0
-2. The values for the not symbolic registers like rdx, rdi, r11, r12 and r15 come from debugging. They were constant between different runnings.
-3. The hardcoded addresses of the symbolics come from binary compiled with the above source code.
+* Since RAX doesn't influence the array, I put it to be 0
+* The values for the not symbolic registers like rdx, rdi, r11, r12 and r15 come from debugging. They were constant between different runnings.
+* The hardcoded addresses of the symbolics come from binary compiled with the above source code.
 
 after running ```trumpervisor.get_flag()```, we get the real flag in addition to the hexadecimal value (which appeared to be meanless):
 flag{HyP3rv1s04z_aRe_T3h_fuTuR3}
