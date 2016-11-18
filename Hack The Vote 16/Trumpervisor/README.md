@@ -15,7 +15,7 @@ What this function do is:
 4. If hypervisor isn't identified and processors supports VT-x, the driver set a DPC on all of available logical processors (using ```KeGenericCallDpc```) which loads the system as a VM on each of them. Also, allocates memory for virtualization data (VMCS for each processor, etc...)
 
 The DPC which finally launch the system as VM is at address ```0x140001740```, which is called also from the driver's unload routine. This routine is used for both launching a VM and unloading virtualization mode on particular processor, depends on its arguments. The unloading part is implemented with "magic sequence" will see later. The launching routine is at address ```0x140001630```:
-#### PIC1
+![alt text](https://raw.githubusercontent.com/dapollak/ctf/master/Hack%20The%20Vote%2016/Trumpervisor/pic1.png)
 The function gets part of the memory big buffer which was allocated before and will be filled with data which is relevant for the VMCS initialization.
 We can see a call to ```RtlCaptureContext```, which saves the current processor state in a ```CONTEXT``` structure. Then, ```vmcs_buffer1 + 1460``` is checked, and if equals to 0, ```enter_root_mode_and_load_vmcs```, ```initialize_vmcs``` and ```vmlaunch``` instruction are called.
 1. ```enter_root_mode_and_load_vmcs``` at address ```0x1400017D0``` - enable vmx operation (```vmxon``` instruction) and load current vmcs sturcture pointer.
@@ -23,7 +23,7 @@ We can see a call to ```RtlCaptureContext```, which saves the current processor 
 
 At the end of ```initialize_vmcs```, we can see what the guest RIP is going to be:
 
-#### PIC2
+![alt text](https://raw.githubusercontent.com/dapollak/ctf/master/Hack%20The%20Vote%2016/Trumpervisor/pic2.png)
 
 RDX is the vmcs1_buffer from the above function, and remember the call for ```RtlCaptureContext(vmcs_buffer1+0xe0)```. That means that ```vmcs_buffer1+0xe0``` is a ```CONTEXT``` structure, and ```vmcs_buffer1+0x1d8```==```vmcs_buffer1+0xf8+0xe0``` which is ```CONTEXT.Rip```:
 ```
@@ -72,13 +72,13 @@ We can see that just before the vmlaunch, ```vmcs_buffer1 + 1460``` is set to 1,
 
 ### Ioctls
 Lets see the dispatch routine for DeviceIoControl - 
-#### PIC 3
+![alt text](https://raw.githubusercontent.com/dapollak/ctf/master/Hack%20The%20Vote%2016/Trumpervisor/pic3.png)
 We see two kinds of ioctls:
 1. At address ```0x140002210``` which set RAX to 0x4141414141414141 and call ```vmcall``` - Sadly, it has nothing to do with the solution.
 2. ```manipulate_globals``` at address ```0x1400012D0```.
 3. 
 ### manipulate_globals function
-#### pic 4
+![alt text](https://raw.githubusercontent.com/dapollak/ctf/master/Hack%20The%20Vote%2016/Trumpervisor/pic4.png)
 Basically, what this function do is xor the bytes at address ```0x1400030C0``` with cyclic 4 bytes length key at ```byte_140004020``` and prints it to debug stream - That looks like a CTF thing, so I guessed the bytes array at ```0x1400030C0``` is the xored-flag. Trying to force the 4 first bytes to be the string 'flag', we get that ```byte_140004020 = [0xb0, 0x93, 0x13, 0x80]```. Then we xored with 0xB0 the next byte, and got '{'. Luck ? No, it's probably the flag.
 After xoring the whole array, we got:
 ```flag{..........................}```. Close, but not.
@@ -89,7 +89,7 @@ I couldn't figure out the connection between the binary and the server for a few
 
 ### Back to initialize_vmcs function
 The only references which are not in ```manipulate_globals``` are in ```initialize_vmcs```. There are 15 of it there (like the number of registers in the server minus 1). at different positions and blocks in the function, and it seemed to be that the code parts which manipulate ```byte_140004020``` don't have any connection with the opcodes before and after it:
-#### pic 5
+![alt text](https://raw.githubusercontent.com/dapollak/ctf/master/Hack%20The%20Vote%2016/Trumpervisor/pic5.png)
 Moreover, we see references to ```rdx+0x198``` and ```rdx+0x1b0```. Remember that earlier we said that ```rdx+0xe0``` holds the processor context captured in ```launching_vm``` ? so,
 * ```rdx+0x198```==```rdx+0xe0+0xb8``` which is ```CONTEXT.r8```
 * ```rdx+0x1b0```==```rdx+0xe0+0xd0``` which is ```CONTEXT.r11```
